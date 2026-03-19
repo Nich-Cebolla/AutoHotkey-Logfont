@@ -1,9 +1,4 @@
-﻿/*
-    Github: https://github.com/Nich-Cebolla/AutoHotkey-LibV2/blob/main/structs/Logfont.ahk
-    Author: Nich-Cebolla
-    License: MIT
-*/
-
+﻿
 class Logfont {
     static __New() {
         this.DeleteProp('__New')
