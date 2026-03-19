@@ -1508,15 +1508,33 @@ Logfont_SetConstants(force := false) {
             return
         }
     } else {
-        g_gdi32_CreateFontIndirectW := 0
-        g_gdi32_DeleteObject := 0
-        g_gdi32_EnumFontFamiliesExW := 0
-        g_gdi32_GetObjectType := 0
-        g_gdi32_GetObjectW := 0
-        g_msvcrt_memmove := 0
-        g_user32_GetDC := 0
-        g_user32_GetDpiForWindow := 0
-        g_user32_ReleaseDC := 0
+        if !IsSet(g_gdi32_CreateFontIndirectW) {
+            g_gdi32_CreateFontIndirectW := 0
+        }
+        if !IsSet(g_gdi32_DeleteObject) {
+            g_gdi32_DeleteObject := 0
+        }
+        if !IsSet(g_gdi32_EnumFontFamiliesExW) {
+            g_gdi32_EnumFontFamiliesExW := 0
+        }
+        if !IsSet(g_gdi32_GetObjectType) {
+            g_gdi32_GetObjectType := 0
+        }
+        if !IsSet(g_gdi32_GetObjectW) {
+            g_gdi32_GetObjectW := 0
+        }
+        if !IsSet(g_msvcrt_memmove) {
+            g_msvcrt_memmove := 0
+        }
+        if !IsSet(g_user32_GetDC) {
+            g_user32_GetDC := 0
+        }
+        if !IsSet(g_user32_GetDpiForWindow) {
+            g_user32_GetDpiForWindow := 0
+        }
+        if !IsSet(g_user32_ReleaseDC) {
+            g_user32_ReleaseDC := 0
+        }
     }
     ; https://github.com/Nich-Cebolla/AutoHotkey-LibV2/blob/main/LibraryManager.ahk
     if IsSet(LibraryManager) {
