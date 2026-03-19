@@ -3,8 +3,7 @@ class Logfont {
     static __New() {
         this.DeleteProp('__New')
         Logfont_SetConstants()
-        Proto := this.Prototype
-        Proto.Encoding := LF_DEFAULT_ENCODING
+        Proto := this.prototype
         /**
          * The structure's size.
          * @memberof Logfont
@@ -126,17 +125,17 @@ class Logfont {
         lf.CharSet := CharSet
         cb := CallbackCreate(Callback)
         result := []
-        hdc := DllCall('GetDC', 'ptr', 0, 'ptr')
+        hdc := DllCall(g_user32_GetDC, 'ptr', 0, 'ptr')
         if ListFaceName.Length {
             for faceName in ListFaceName {
                 lf.FaceName := faceName
-                result.Push(DllCall('gdi32\EnumFontFamiliesExW', 'ptr', hdc, 'ptr', lf, 'ptr', cb, 'ptr', lParam, 'uint', 0, 'uint'))
+                result.Push(DllCall(g_gdi32_EnumFontFamiliesExW, 'ptr', hdc, 'ptr', lf, 'ptr', cb, 'ptr', lParam, 'uint', 0, 'uint'))
             }
         } else {
             NumPut('char', 0, lf, 32)
-            result.Push(DllCall('gdi32\EnumFontFamiliesExW', 'ptr', hdc, 'ptr', lf, 'ptr', cb, 'ptr', lParam, 'uint', 0, 'uint'))
+            result.Push(DllCall(g_gdi32_EnumFontFamiliesExW, 'ptr', hdc, 'ptr', lf, 'ptr', cb, 'ptr', lParam, 'uint', 0, 'uint'))
         }
-        DllCall('ReleaseDC', 'ptr', 0, 'ptr', hdc)
+        DllCall(g_user32_ReleaseDC, 'ptr', 0, 'ptr', hdc)
         CallbackFree(cb)
 
         return result
@@ -186,16 +185,16 @@ class Logfont {
         lf := Logfont()
         lf.CharSet := CharSet
         result := ''
-        hdc := DllCall('GetDC', 'ptr', 0, 'ptr')
-        cb := CallbackCreate(Callback ?? (Style ? EnumFontProc1 : EnumFontProc2))
+        hdc := DllCall(g_user32_GetDC, 'ptr', 0, 'ptr')
+        cb := CallbackCreate(Callback ?? (Style ? EnumFontProc1 : EnumFontProc2), 'F')
         for faceName in ListFaceName {
             lf.FaceName := faceName
-            if !DllCall('gdi32\EnumFontFamiliesExW', 'ptr', hdc, 'ptr', Lf, 'ptr', cb, 'ptr', Lf.Ptr + 28, 'uint', 0, 'uint') {
+            if !DllCall(g_gdi32_EnumFontFamiliesExW, 'ptr', hdc, 'ptr', Lf, 'ptr', cb, 'ptr', Lf.Ptr + 28, 'uint', 0, 'uint') {
                 result := faceName
                 break
             }
         }
-        DllCall('ReleaseDC', 'ptr', 0, 'ptr', hdc)
+        DllCall(g_user32_ReleaseDC, 'ptr', 0, 'ptr', hdc)
         CallbackFree(cb)
 
         return result
@@ -221,11 +220,12 @@ class Logfont {
      * will only be available temporarily. When using `Logfont.FromPtr`, do not cache a reference to
      * the {@link Logfont} object; use it then let it go out of scope, or copy its values to an AHK buffer
      * using `Logfont.Prototype.Clone`.
-     * @param {Integer} Ptr - The address of the LOGFONT structure.
+     *
+     * @param {Integer} ptr - The address of the LOGFONT structure.
      */
-    static FromPtr(Ptr) {
-        lf := { Buffer: { Ptr: Ptr, Size: this.Prototype.Size }, Handle: 0 }
-        ObjSetBase(lf, this.Prototype)
+    static FromPtr(ptr) {
+        lf := { buffer: { ptr: ptr, size: this.prototype.size }, handle: 0 }
+        ObjSetBase(lf, this.prototype)
         return lf
     }
     /**
@@ -256,47 +256,37 @@ class Logfont {
      *  lf.Apply()
      * @
      *
-     * @param {Integer} [Hwnd = 0] - The window handle to associate with the {@link Logfont} object. If
-     * `Hwnd` is set with a nonzero value, `Logfont.Prototype.Call` is called to initialize this
-     * {@link Logfont} object's properties with values obtained from the window. If `Hwnd` is zero, this
-     * {@link Logfont} object's properties will all be zero.
-     *
-     * @param {String} [Encoding] - The encoding used when getting and setting string values associated
-     * with LOGFONT members. The default encoding used by {@link Logfont} objects is UTF-16.
-     *
-     * @return {Logfont}
+     * @param {Integer} [hwnd] - The window handle to associate with the {@link Logfont} object. If
+     * `hwnd` is set with a nonzero value, `Logfont.Prototype.Call` is called to initialize this
+     * {@link Logfont} object's properties with values obtained from the window. If unset, the buffer
+     * is initialized with `0` values.
      */
-    __New(Hwnd := 0, Encoding?) {
+    __New(hwnd?) {
         /**
          * A reference to the buffer object which is used as the LOGFONT structure.
          * @memberof Logfont
          * @instance
+         * @type {Buffer}
          */
-        this.Buffer := Buffer(this.Size, 0)
-        if IsSet(Encoding) {
+        this.buffer := Buffer(this.size, 0)
+        /**
+         * The handle to the font object created by this object.
+         * @memberof Logfont
+         * @instance
+         * @type {Integer}
+         */
+        this.handle := 0
+        if IsSet(hwnd) {
             /**
-             * The encoding to use with `StrPut` and `StrGet` when handling strings. Not seen
-             * here, the value of `Logfont.Prototype.Encoding` is "UTF-16".
+             * The handle to the window associated with this object, if any.
              * @memberof Logfont
              * @instance
+             * @type {Integer}
              */
-            this.Encoding := Encoding
-        }
-        /**
-         * The handle to the font object created by this object. Initially, this object
-         * will not have yet created an object, so the handle is `0` until `Logfont.Prototype.Apply`
-         * is called.
-         * @memberof Logfont
-         * @instance
-         */
-        this.Handle := 0
-        /**
-         * The handle to the window associated with this object, if any.
-         * @memberof Logfont
-         * @instance
-         */
-        if this.Hwnd := Hwnd {
-            this()
+            this.hwnd := hwnd
+            if hwnd {
+                this()
+            }
         }
     }
     /**
@@ -306,12 +296,12 @@ class Logfont {
      * WM_SETFONT. If true, the control redraws itself.
      */
     Apply(Redraw := true) {
-        hFontOld := SendMessage(WM_GETFONT,,, this.Hwnd)
-        Flag := this.Handle = hFontOld
-        this.Handle := DllCall('CreateFontIndirectW', 'ptr', this, 'ptr')
-        SendMessage(WM_SETFONT, this.Handle, Redraw, this.Hwnd)
+        hFontOld := SendMessage(0x0031,,, this.hwnd) ; WM_GETFONT
+        Flag := this.handle = hFontOld
+        this.handle := DllCall(g_gdi32_CreateFontIndirectW, 'ptr', this, 'ptr')
+        SendMessage(0x0030, this.handle, Redraw, this.hwnd) ; WM_SETFONT
         if Flag {
-            DllCall('DeleteObject', 'ptr', hFontOld, 'int')
+            DllCall(g_gdi32_DeleteObject, 'ptr', hFontOld, 'int')
         }
     }
     /**
@@ -320,8 +310,8 @@ class Logfont {
      * @throws {OSError} - Failed to get font object.
      */
     Call(*) {
-        hFont := SendMessage(WM_GETFONT,,, this.Hwnd)
-        if !DllCall('Gdi32.dll\GetObject', 'ptr', hFont, 'int', this.Size, 'ptr', this, 'uint') {
+        hFont := SendMessage(0x0031,,, this.hwnd) ; WM_GETFONT
+        if !DllCall(g_gdi32_GetObjectW, 'ptr', hFont, 'int', this.size, 'ptr', this, 'uint') {
             throw OSError('Failed to get font object.')
         }
     }
@@ -353,9 +343,9 @@ class Logfont {
      * is deleted.
      */
     DisposeFont() {
-        if this.Handle {
-            DllCall('DeleteObject', 'ptr', this.Handle)
-            this.Handle := 0
+        if this.handle {
+            DllCall(g_gdi32_DeleteObject, 'ptr', this.handle)
+            this.handle := 0
         }
     }
     /**
@@ -398,10 +388,10 @@ class Logfont {
      */
     EnumFontFamilies(Callback, lParam := 0) {
         result := ''
-        cb := CallbackCreate(Callback)
-        hdc := DllCall('GetDC', 'ptr', this.Hwnd, 'ptr')
-        result := DllCall('gdi32\EnumFontFamiliesExW', 'ptr', hdc, 'ptr', this, 'ptr', cb, 'ptr', lParam, 'uint', 0, 'uint')
-        DllCall('ReleaseDC', 'ptr', this.Hwnd, 'ptr', hdc)
+        cb := CallbackCreate(Callback, 'F')
+        hdc := DllCall(g_user32_GetDC, 'ptr', this.hwnd, 'ptr')
+        result := DllCall(g_gdi32_EnumFontFamiliesExW, 'ptr', hdc, 'ptr', this, 'ptr', cb, 'ptr', lParam, 'uint', 0, 'uint')
+        DllCall(g_user32_ReleaseDC, 'ptr', this.hwnd, 'ptr', hdc)
         CallbackFree(cb)
         return result
     }
@@ -415,8 +405,8 @@ class Logfont {
         this.Apply()
     }
     __Delete() {
-        if this.Handle {
-            DllCall('DeleteObject', 'ptr', this.Handle)
+        if this.handle {
+            DllCall(g_gdi32_DeleteObject, 'ptr', this.handle)
         }
     }
     /**
@@ -424,7 +414,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    CharSet {
+    charSet {
         Get => NumGet(this, 23, 'uchar')
         Set => NumPut('uchar', Value, this, 23)
     }
@@ -433,7 +423,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    ClipPrecision {
+    clipPrecision {
         Get => NumGet(this, 25, 'uchar')
         Set => NumPut('uchar', Value, this, 25)
     }
@@ -442,13 +432,13 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    Dpi => this.Hwnd ? DllCall('User32\GetDpiForWindow', 'Ptr', this.Hwnd, 'UInt') : 96
+    dpi => this.hwnd ? DllCall(g_user32_GetDpiForWindow, 'Ptr', this.hwnd, 'UInt') : 96
     /**
      * Gets or sets the escapement measured in tenths of a degree.
      * @memberof Logfont
      * @instance
      */
-    Escapement {
+    escapement {
         Get => NumGet(this, 8, 'int')
         Set => NumPut('int', Value, this, 8)
     }
@@ -457,18 +447,18 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    FaceName {
-        Get => StrGet(this.ptr + 28, 32, this.Encoding)
-        Set => StrPut(SubStr(Value, 1, 31), this.Ptr + 28, 32, this.Encoding)
+    faceName {
+        Get => StrGet(this.ptr + 28, 32, LF_DEFAULT_ENCODING)
+        Set => StrPut(SubStr(Value, 1, 31), this.ptr + 28, 32, LF_DEFAULT_ENCODING)
     }
     /**
      * Gets or sets the font family.
      * @memberof Logfont
      * @instance
      */
-    Family {
+    family {
         Get => NumGet(this, 27, 'uchar') & 0xF0
-        Set => NumPut('uchar', (this.Family & 0x0F) | (Value & 0xF0), this, 27)
+        Set => NumPut('uchar', (this.family & 0x0F) | (Value & 0xF0), this, 27)
     }
     /**
      * Gets or sets the font size. "FontSize" requires that the {@link Logfont} object is associated
@@ -476,16 +466,16 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    FontSize {
-        Get => Round(this.Height * -72 / this.Dpi, 0)
-        Set => this.Height := Round(Value * this.Dpi / -72)
+    fontSize {
+        Get => Round(this.height * -72 / this.dpi, 0)
+        Set => this.height := Round(Value * this.dpi / -72)
     }
     /**
      * Gets or sets the font height.
      * @memberof Logfont
      * @instance
      */
-    Height {
+    height {
         Get => NumGet(this, 0, 'int')
         Set => NumPut('int', Value, this, 0)
     }
@@ -494,7 +484,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    Italic {
+    italic {
         Get => NumGet(this, 20, 'uchar')
         Set => NumPut('uchar', Value ? 1 : 0, this, 20)
     }
@@ -503,7 +493,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    Orientation {
+    orientation {
         Get => NumGet(this, 12, 'int')
         Set => NumPut('int', Value, this, 12)
     }
@@ -512,7 +502,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    OutPrecision {
+    outPrecision {
         Get => NumGet(this, 24, 'uchar')
         Set => NumPut('uchar', Value, this, 24)
     }
@@ -521,22 +511,22 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    Pitch {
+    pitch {
         Get => NumGet(this, 27, 'uchar') & 0x0F
-        Set => NumPut('uchar', (this.Pitch & 0xF0) | (Value & 0x0F), this, 27)
+        Set => NumPut('uchar', (this.pitch & 0xF0) | (Value & 0x0F), this, 27)
     }
     /**
      * Returns the pointer to the buffer.
      * @memberof Logfont
      * @instance
      */
-    Ptr => this.Buffer.Ptr
+    ptr => this.buffer.Ptr
     /**
      * Gets or sets the quality flag.
      * @memberof Logfont
      * @instance
      */
-    Quality {
+    quality {
         Get => NumGet(this, 26, 'uchar')
         Set => NumPut('uchar', Value, this, 26)
     }
@@ -545,7 +535,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    StrikeOut {
+    strikeOut {
         Get => NumGet(this, 22, 'uchar')
         Set => NumPut('uchar', Value ? 1 : 0, this, 22)
     }
@@ -554,7 +544,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    Underline {
+    underline {
         Get => NumGet(this, 21, 'uchar')
         Set => NumPut('uchar', Value ? 1 : 0, this, 21)
     }
@@ -563,7 +553,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    Weight {
+    weight {
         Get => NumGet(this, 16, 'int')
         Set => NumPut('int', Value, this, 16)
     }
@@ -572,7 +562,7 @@ class Logfont {
      * @memberof Logfont
      * @instance
      */
-    Width {
+    width {
         Get => NumGet(this, 4, 'int')
         Set => NumPut('int', Value, this, 4)
     }
@@ -610,16 +600,16 @@ class EnumFontFamExProcParams {
      * indicating the font type.
      */
     __New(lpelfe, lpntme, FontType) {
-        this.FontType := FontType
-        if this.IsTrueType {
+        this.fontType := FontType
+        if this.isTrueType {
             /**
              * See the description above {@link EnumFontFamExProcParams#__New}.
              * @memberof EnumFontFamExProcParams
              * @instance
              */
-            this.TextMetric := NewTextMetricEx(lpntme)
+            this.textMetric := NewTextMetricEx(lpntme)
         } else {
-            this.TextMetric := TextMetric(lpntme)
+            this.textMetric := TextMetric(lpntme)
         }
         /**
          * A {@link Logfont} object.
@@ -627,27 +617,27 @@ class EnumFontFamExProcParams {
          * @instance
          * @type {Logfont}
          */
-        this.Logfont := Logfont.FromPtr(lpelfe)
+        this.logfont := Logfont.FromPtr(lpelfe)
         /**
          * A {@link EnumLogFontExW} object.
          * @memberof EnumFontFamExProcParams
          * @instance
          * @type {EnumLogFontExW}
          */
-        this.LogFontEx := EnumLogFontExW(lpelfe)
+        this.logFontEx := EnumLogFontExW(lpelfe)
         /**
          * The full name of the font, e.g. "Arial Bold".
          * @memberof EnumFontFamExProcParams
          * @instance
          */
-        this.FullName := StrGet(lpelfe + this.Logfont.Size, LF_DEFAULT_ENCODING)
+        this.fullName := StrGet(lpelfe + this.logfont.Size, LF_DEFAULT_ENCODING)
     }
     Clone() {
         Obj := {
-            FontType: this.FontType
-          , FullName: this.FullName
-          , Logfont: this.Logfont.Clone()
-          , TextMetric: this.TextMetric.Clone()
+            FontType: this.fontType
+          , FullName: this.fullName
+          , Logfont: this.logfont.Clone()
+          , TextMetric: this.textMetric.Clone()
         }
         ObjSetBase(Obj, EnumFontFamExProcParams.Prototype)
         return Obj
@@ -659,26 +649,26 @@ class EnumFontFamExProcParams {
      * @memberof EnumFontFamExProcParams
      * @instance
      */
-    IsDevice => this.FontType & 0x0002
+    isDevice => this.fontType & 0x0002
     /**
      * A boolean indicating if the font is a raster font.
      * @memberof EnumFontFamExProcParams
      * @instance
      */
-    IsRaster => this.FontType & 0x0001
+    isRaster => this.fontType & 0x0001
     /**
      * A boolean indicating if the font is a TrueType font.
      * @memberof EnumFontFamExProcParams
      * @instance
      */
-    IsTrueType => this.FontType & 0x0004
+    isTrueType => this.fontType & 0x0004
 }
 
 class EnumLogFontExW {
     static __New() {
         this.DeleteProp('__New')
         Logfont_SetConstants()
-        proto := this.Prototype
+        proto := this.prototype
         proto.Size :=
         4 +    ; LONG  lfHeight                      0
         4 +    ; LONG  lfWidth                       4
@@ -707,30 +697,30 @@ class EnumLogFontExW {
     __New(ptr) {
         this.ptr := ptr
     }
-    CharSet => NumGet(this, 23, 'uchar')
-    ClipPrecision => NumGet(this, 25, 'uchar')
-    Escapement => NumGet(this, 8, 'int')
-    FaceName => StrGet(this.ptr + 28, 32, LF_DEFAULT_ENCODING)
-    Family => NumGet(this, 27, 'uchar') & 0xF0
-    FullName => StrGet(this.ptr + 92, 64, LF_DEFAULT_ENCODING)
-    Height => NumGet(this, 0, 'int')
-    Italic => NumGet(this, 20, 'uchar')
-    Orientation => NumGet(this, 12, 'int')
-    OutPrecision => NumGet(this, 24, 'uchar')
-    Pitch => NumGet(this, 27, 'uchar') & 0x0F
-    Quality => NumGet(this, 26, 'uchar')
-    Script => StrGet(this.ptr + 284, 32, LF_DEFAULT_ENCODING)
-    StrikeOut => NumGet(this, 22, 'uchar')
-    Style => StrGet(this.ptr + 220, 32, LF_DEFAULT_ENCODING)
-    Underline => NumGet(this, 21, 'uchar')
-    Weight => NumGet(this, 16, 'int')
-    Width => NumGet(this, 4, 'int')
+    charSet => NumGet(this, 23, 'uchar')
+    clipPrecision => NumGet(this, 25, 'uchar')
+    escapement => NumGet(this, 8, 'int')
+    faceName => StrGet(this.ptr + 28, 32, LF_DEFAULT_ENCODING)
+    family => NumGet(this, 27, 'uchar') & 0xF0
+    fullName => StrGet(this.ptr + 92, 64, LF_DEFAULT_ENCODING)
+    height => NumGet(this, 0, 'int')
+    italic => NumGet(this, 20, 'uchar')
+    orientation => NumGet(this, 12, 'int')
+    outPrecision => NumGet(this, 24, 'uchar')
+    pitch => NumGet(this, 27, 'uchar') & 0x0F
+    quality => NumGet(this, 26, 'uchar')
+    script => StrGet(this.ptr + 284, 32, LF_DEFAULT_ENCODING)
+    strikeOut => NumGet(this, 22, 'uchar')
+    style => StrGet(this.ptr + 220, 32, LF_DEFAULT_ENCODING)
+    underline => NumGet(this, 21, 'uchar')
+    weight => NumGet(this, 16, 'int')
+    width => NumGet(this, 4, 'int')
 }
 class TextMetric {
     static __New() {
         this.DeleteProp('__New')
         Logfont_SetConstants()
-        proto := this.Prototype
+        proto := this.prototype
         proto.size :=
         ; SizeType       Symbol                Offset   Padding
         4 +       ; LONG     tmHeight              0
@@ -786,34 +776,34 @@ class TextMetric {
     __New(ptr) {
         this.ptr := ptr
     }
-    Ascent => NumGet(this.ptr, this.offset_Ascent, 'uint')
-    AveCharWidth => NumGet(this.ptr, this.offset_AveCharWidth, 'uint')
-    BreakChar => NumGet(this.ptr, this.offset_BreakChar, 'ushort')
-    CharSet => NumGet(this.ptr, this.offset_CharSet, 'uchar')
-    DefaultChar => NumGet(this.ptr, this.offset_DefaultChar, 'ushort')
-    Descent => NumGet(this.ptr, this.offset_Descent, 'uint')
-    DigitizedAspectX => NumGet(this.ptr, this.offset_DigitizedAspectX, 'uint')
-    DigitizedAspectY => NumGet(this.ptr, this.offset_DigitizedAspectY, 'uint')
-    ExternalLeading => NumGet(this.ptr, this.offset_ExternalLeading, 'uint')
-    FirstChar => NumGet(this.ptr, this.offset_FirstChar, 'ushort')
-    Height => NumGet(this.ptr, this.offset_Height, 'uint')
-    InternalLeading => NumGet(this.ptr, this.offset_InternalLeading, 'uint')
-    IsDevice => (NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 3) & 1
-    IsRaster => !((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 1) & 1) && !((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 2) & 1)
-    IsVector => ((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 1) & 1) && !((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 2) & 1)
-    Italic => NumGet(this.ptr, this.offset_Italic, 'uchar')
-    LastChar => NumGet(this.ptr, this.offset_LastChar, 'ushort')
-    MaxCharWidth => NumGet(this.ptr, this.offset_MaxCharWidth, 'uint')
-    Overhang => NumGet(this.ptr, this.offset_Overhang, 'uint')
-    PitchAndFamily => NumGet(this.ptr, this.offset_PitchAndFamily, 'uchar')
-    StruckOut => NumGet(this.ptr, this.offset_StruckOut, 'uchar')
-    Underlined => NumGet(this.ptr, this.offset_Underlined, 'uchar')
-    Weight => NumGet(this.ptr, this.offset_Weight, 'uint')
+    ascent => NumGet(this.ptr, this.offset_Ascent, 'uint')
+    aveCharWidth => NumGet(this.ptr, this.offset_AveCharWidth, 'uint')
+    breakChar => NumGet(this.ptr, this.offset_BreakChar, 'ushort')
+    charSet => NumGet(this.ptr, this.offset_CharSet, 'uchar')
+    defaultChar => NumGet(this.ptr, this.offset_DefaultChar, 'ushort')
+    descent => NumGet(this.ptr, this.offset_Descent, 'uint')
+    digitizedAspectX => NumGet(this.ptr, this.offset_DigitizedAspectX, 'uint')
+    digitizedAspectY => NumGet(this.ptr, this.offset_DigitizedAspectY, 'uint')
+    externalLeading => NumGet(this.ptr, this.offset_ExternalLeading, 'uint')
+    firstChar => NumGet(this.ptr, this.offset_FirstChar, 'ushort')
+    height => NumGet(this.ptr, this.offset_Height, 'uint')
+    internalLeading => NumGet(this.ptr, this.offset_InternalLeading, 'uint')
+    isDevice => (NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 3) & 1
+    isRaster => !((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 1) & 1) && !((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 2) & 1)
+    isVector => ((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 1) & 1) && !((NumGet(this, this.offset_PitchAndFamily, 'uchar') >> 2) & 1)
+    italic => NumGet(this.ptr, this.offset_Italic, 'uchar')
+    lastChar => NumGet(this.ptr, this.offset_LastChar, 'ushort')
+    maxCharWidth => NumGet(this.ptr, this.offset_MaxCharWidth, 'uint')
+    overhang => NumGet(this.ptr, this.offset_Overhang, 'uint')
+    pitchAndFamily => NumGet(this.ptr, this.offset_PitchAndFamily, 'uchar')
+    struckOut => NumGet(this.ptr, this.offset_StruckOut, 'uchar')
+    underlined => NumGet(this.ptr, this.offset_Underlined, 'uchar')
+    weight => NumGet(this.ptr, this.offset_Weight, 'uint')
 }
 class NewTextMetric {
     static __New() {
         this.DeleteProp('__New')
-        proto := this.Prototype
+        proto := this.prototype
         proto.size :=
         ; Size  Type       Symbol                Offset         Padding
         4 +             ; LONG     tmHeight              0
@@ -900,32 +890,32 @@ class NewTextMetric {
      * the input flag.
      */
     QueryFontFlag(Value) {
-        return this.Flags & Value
+        return this.flags & Value
     }
-    Ascent => NumGet(this.ptr, this.offset_Ascent, 'uint')
-    AveCharWidth => NumGet(this.ptr, this.offset_AveCharWidth, 'uint')
-    AvgWidth => NumGet(this.ptr, this.offset_AvgWidth, 'uint')
-    BreakChar => NumGet(this.ptr, this.offset_BreakChar, 'ushort')
-    CellHeight => NumGet(this.ptr, this.offset_CellHeight, 'uint')
-    CharSet => NumGet(this.ptr, this.offset_CharSet, 'uchar')
-    DefaultChar => NumGet(this.ptr, this.offset_DefaultChar, 'ushort')
-    Descent => NumGet(this.ptr, this.offset_Descent, 'uint')
-    DigitizedAspectX => NumGet(this.ptr, this.offset_DigitizedAspectX, 'uint')
-    DigitizedAspectY => NumGet(this.ptr, this.offset_DigitizedAspectY, 'uint')
-    ExternalLeading => NumGet(this.ptr, this.offset_ExternalLeading, 'uint')
-    FirstChar => NumGet(this.ptr, this.offset_FirstChar, 'ushort')
-    Flags => NumGet(this.ptr, this.offset_Flags, 'uint')
-    Height => NumGet(this.ptr, this.offset_Height, 'uint')
-    InternalLeading => NumGet(this.ptr, this.offset_InternalLeading, 'uint')
-    Italic => NumGet(this.ptr, this.offset_Italic, 'uchar')
-    LastChar => NumGet(this.ptr, this.offset_LastChar, 'ushort')
-    MaxCharWidth => NumGet(this.ptr, this.offset_MaxCharWidth, 'uint')
-    Overhang => NumGet(this.ptr, this.offset_Overhang, 'uint')
-    PitchAndFamily => NumGet(this.ptr, this.offset_PitchAndFamily, 'uchar')
-    SizeEM => NumGet(this.ptr, this.offset_SizeEM, 'uint')
-    StruckOut => NumGet(this.ptr, this.offset_StruckOut, 'uchar')
-    Underlined => NumGet(this.ptr, this.offset_Underlined, 'uchar')
-    Weight => NumGet(this.ptr, this.offset_Weight, 'uint')
+    ascent => NumGet(this.ptr, this.offset_Ascent, 'uint')
+    aveCharWidth => NumGet(this.ptr, this.offset_AveCharWidth, 'uint')
+    avgWidth => NumGet(this.ptr, this.offset_AvgWidth, 'uint')
+    breakChar => NumGet(this.ptr, this.offset_BreakChar, 'ushort')
+    cellHeight => NumGet(this.ptr, this.offset_CellHeight, 'uint')
+    charSet => NumGet(this.ptr, this.offset_CharSet, 'uchar')
+    defaultChar => NumGet(this.ptr, this.offset_DefaultChar, 'ushort')
+    descent => NumGet(this.ptr, this.offset_Descent, 'uint')
+    digitizedAspectX => NumGet(this.ptr, this.offset_DigitizedAspectX, 'uint')
+    digitizedAspectY => NumGet(this.ptr, this.offset_DigitizedAspectY, 'uint')
+    externalLeading => NumGet(this.ptr, this.offset_ExternalLeading, 'uint')
+    firstChar => NumGet(this.ptr, this.offset_FirstChar, 'ushort')
+    flags => NumGet(this.ptr, this.offset_Flags, 'uint')
+    height => NumGet(this.ptr, this.offset_Height, 'uint')
+    internalLeading => NumGet(this.ptr, this.offset_InternalLeading, 'uint')
+    italic => NumGet(this.ptr, this.offset_Italic, 'uchar')
+    lastChar => NumGet(this.ptr, this.offset_LastChar, 'ushort')
+    maxCharWidth => NumGet(this.ptr, this.offset_MaxCharWidth, 'uint')
+    overhang => NumGet(this.ptr, this.offset_Overhang, 'uint')
+    pitchAndFamily => NumGet(this.ptr, this.offset_PitchAndFamily, 'uchar')
+    sizeEM => NumGet(this.ptr, this.offset_SizeEM, 'uint')
+    struckOut => NumGet(this.ptr, this.offset_StruckOut, 'uchar')
+    underlined => NumGet(this.ptr, this.offset_Underlined, 'uchar')
+    weight => NumGet(this.ptr, this.offset_Weight, 'uint')
 }
 
 /**
@@ -944,7 +934,7 @@ class NewTextMetricEx {
          * @memberof NewTextMetricEx
          * @instance
          */
-        this.Prototype.Size := NewTextMetric.Prototype.Size + FontSignature.Prototype.Size
+        this.prototype.Size := NewTextMetric.Prototype.Size + FontSignature.Prototype.Size
     }
     /**
      * @class
@@ -962,13 +952,13 @@ class NewTextMetricEx {
          * @memberof NewTextMetricEx
          * @instance
          */
-        this.TextMetric := NewTextMetric(this.Ptr)
+        this.textMetric := NewTextMetric(this.ptr)
         /**
          * A FONTSIGNATURE structure mapped to an AHK `FontSignature` object.
          * @memberof NewTextMetricEx
          * @instance
          */
-        this.FontSignature := FontSignature(this.Ptr + this.TextMetric.Size)
+        this.fontSignature := FontSignature(this.ptr + this.textMetric.Size)
     }
     /**
      * @description - Copies the bytes from this `NewTextMetricEx` object's buffer to another buffer.
@@ -997,16 +987,16 @@ class NewTextMetricEx {
                 throw TypeError('Invalid input parameter ``Buf``.')
             }
         } else {
-            Buf := Buffer(this.Size + Offset)
+            Buf := Buffer(this.size + Offset)
         }
-        if Buf.Size < this.Size + Offset {
+        if Buf.Size < this.size + Offset {
             throw Error('The input buffer`'s size is insufficient.', , Buf.Size)
         }
         DllCall(
-            'msvcrt.dll\memmove'
+            g_msvcrt_memmove
           , 'ptr', Buf.Ptr + Offset
-          , 'ptr', this.Ptr
-          , 'int', this.Size
+          , 'ptr', this.ptr
+          , 'int', this.size
           , 'ptr'
         )
         if MakeInstance {
@@ -1028,10 +1018,10 @@ class FontSignature {
          * @memberof FontSignature
          * @instance
          */
-        this.Prototype.Size :=
+        this.prototype.Size :=
         16 +   ; DWORD fsUsb[4]         0
         8      ; DWORD fsCsb[2]         16
-        this.Prototype.DefineProp('Clone', { Call: LF_CloneBuffer })
+        this.prototype.DefineProp('Clone', { Call: LF_CloneBuffer })
 
         /**
          * The "Key" is the bit in the Unicode subset bitfield, and the value is an object with
@@ -1039,7 +1029,7 @@ class FontSignature {
          * {@link https://learn.microsoft.com/en-us/windows/win32/intl/unicode-subset-bitfields}.
          * @memberof FontSignature
          */
-        this.Usb := Map(
+        this.usb := Map(
             0, { Bit: 0, Lb: 0x0000, Ub: 0x007F, Desc: 'Basic Latin' }
           , 1, { Bit: 1, Lb: 0x0080, Ub: 0x00FF, Desc: 'Latin-1 Supplement' }
           , 2, { Bit: 2, Lb: 0x0100, Ub: 0x017F, Desc: 'Latin Extended-A' }
@@ -1266,7 +1256,7 @@ class FontSignature {
         ; This sorts the objects in order from lowest to highest using the value of "Lb"
         ; and adds them to array NewTextMetic.UsbOrdered`.
         list := ''
-        for bit, obj in this.Usb {
+        for bit, obj in this.usb {
             if HasProp(obj, 'Ranges') {
                 for _obj in obj.Ranges {
                     list .= _obj.Lb ':' ObjPtr(_obj) '`n'
@@ -1280,7 +1270,7 @@ class FontSignature {
          * An array containing references to the same objects in the map {@link FontSignature.Usb}
          * @memberof FontSignature
          */
-        ordered := this.UsbOrdered := []
+        ordered := this.usbOrdered := []
         ordered.Capacity := list.Length
         for str in list {
             ordered.Push(ObjFromPtrAddRef(SubStr(str, InStr(str, ':') + 1)))
@@ -1293,7 +1283,7 @@ class FontSignature {
          * {@link https://learn.microsoft.com/en-us/windows/win32/intl/code-page-bitfields}.
          * @memberof FontSignature
          */
-        this.Cpb := Map(
+        this.cpb := Map(
             0, { Bit: 0, Cp: 1252, Desc: 'Latin 1' }
           , 1, { Bit: 1, Cp: 1250, Desc: 'Latin 2: Central Europe' }
           , 2, { Bit: 2, Cp: 1251, Desc: 'Cyrillic' }
@@ -1334,8 +1324,8 @@ class FontSignature {
          * {@link https://learn.microsoft.com/en-us/windows/win32/intl/code-page-bitfields}.
          * @memberof FontSignature
          */
-        cp2b := this.CodePageToBit := Map()
-        for bit, obj in this.Cpb {
+        cp2b := this.codePageToBit := Map()
+        for bit, obj in this.cpb {
             cp2b.Set(obj.Cp, bit)
         }
         cp2b.Set(708, 61)
@@ -1407,7 +1397,7 @@ class FontSignature {
             return -1
         }
         OutObj := FontSignature.CodePageToBit.Get(cp)
-        return (NumGet(this.Ptr + 16, OutObj.Bit >> 3, 'uchar') >> (OutObj.Bit & 7)) & 1
+        return (NumGet(this.ptr + 16, OutObj.Bit >> 3, 'uchar') >> (OutObj.Bit & 7)) & 1
     }
     /**
      * @description - Takes a unicode code point as an input and returns an integer repesenting one
@@ -1460,7 +1450,7 @@ class FontSignature {
         _Proc(i) {
             if ordered[i].Lb <= Lb && ordered[i].Ub >= Lb {
                 OutObj := ordered[i]
-                return (NumGet(this.Ptr, OutObj.Bit >> 3, 'uchar') >> (OutObj.Bit & 7)) & 1
+                return (NumGet(this.ptr, OutObj.Bit >> 3, 'uchar') >> (OutObj.Bit & 7)) & 1
             } else {
                 return -1
             }
@@ -1483,7 +1473,7 @@ LF_CloneBuffer(Self, Buf?, Offset := 0, MakeInstance := true) {
         throw Error('The input buffer`'s size is insufficient.', , Buf.Size)
     }
     DllCall(
-        'msvcrt.dll\memmove'
+        g_msvcrt_memmove
       , 'ptr', Buf.Ptr + Offset
       , 'ptr', Self.Ptr
       , 'int', Self.Size
@@ -1513,12 +1503,55 @@ LF_CloneBuffer(Self, Buf?, Offset := 0, MakeInstance := true) {
 
 Logfont_SetConstants(force := false) {
     global
-    if IsSet(Logfont_constants_set) && !force {
-        return
+    if IsSet(Logfont_constants_set) {
+        if !force {
+            return
+        }
+    } else {
+        g_gdi32_CreateFontIndirectW := 0
+        g_gdi32_DeleteObject := 0
+        g_gdi32_EnumFontFamiliesExW := 0
+        g_gdi32_GetObjectType := 0
+        g_gdi32_GetObjectW := 0
+        g_msvcrt_memmove := 0
+        g_user32_GetDC := 0
+        g_user32_GetDpiForWindow := 0
+        g_user32_ReleaseDC := 0
+    }
+    ; https://github.com/Nich-Cebolla/AutoHotkey-LibV2/blob/main/LibraryManager.ahk
+    if IsSet(LibraryManager) {
+        Logfont_LibraryToken := LibraryManager(
+            'gdi32', [
+                'CreateFontIndirectW',
+                'DeleteObject',
+                'EnumFontFamiliesExW',
+                'GetObjectType',
+                'GetObjectW'
+            ],
+            'msvcrt', [
+                'memmove'
+            ],
+            'user32', [
+                'GetDC',
+                'GetDpiForWindow',
+                'ReleaseDC'
+            ]
+        )
+    } else {
+        local hmod := DllCall('GetModuleHandleW', 'wstr', 'gdi32', 'ptr')
+        g_gdi32_CreateFontIndirectW := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'CreateFontIndirectW', 'ptr')
+        g_gdi32_DeleteObject := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'DeleteObject', 'ptr')
+        g_gdi32_EnumFontFamiliesExW := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'EnumFontFamiliesExW', 'ptr')
+        g_gdi32_GetObjectType := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'GetObjectType', 'ptr')
+        g_gdi32_GetObjectW := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'GetObjectW', 'ptr')
+        hmod := DllCall('GetModuleHandleW', 'wstr', 'msvcrt', 'ptr')
+        g_msvcrt_memmove := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'memmove', 'ptr')
+        hmod := DllCall('GetModuleHandleW', 'wstr', 'user32', 'ptr')
+        g_user32_GetDpiForWindow := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'GetDpiForWindow', 'ptr')
+        g_user32_GetDC := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'GetDC', 'ptr')
+        g_user32_ReleaseDC := DllCall('GetProcAddress', 'ptr', hmod, 'astr', 'ReleaseDC', 'ptr')
     }
 
-    WM_GETFONT := 0x0031
-    WM_SETFONT := 0x0030
     LF_DEFAULT_ENCODING := 'UTF-16'
 
     Logfont_constants_set := true
