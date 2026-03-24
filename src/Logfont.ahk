@@ -430,11 +430,6 @@ class Logfont {
     SetFontSize(points, dpi := this.dpi) {
         return this.height := Round(points / -72 * dpi, 0)
     }
-    __Delete() {
-        if this.handle {
-            DllCall(g_gdi32_DeleteObject, 'ptr', this.handle)
-        }
-    }
     /**
      * Gets or sets the character set.
      * @memberof Logfont
