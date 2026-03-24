@@ -396,6 +396,18 @@ class Logfont {
         return result
     }
     /**
+     * @desc - Returns the font size in points.
+     *
+     * @param {Integer} [dpi = this.dpi] - The dpi. If unset, and if {@link Logfont#hwnd} is defined,
+     * the dpi of the window associated with {@link Logfont#hwnd} is used. If {@link Logfont#hwnd}
+     * is **not** defined, `96` is used.
+     *
+     * @returns {Integer} - The font size in points as `Round(this.height * -72 / dpi, 0)`.
+     */
+    GetFontSize(dpi := this.dpi) {
+        return Round(this.height * -72 / dpi, 0)
+    }
+    /**
      * @description - Updates a property's value then calls {@link Logfont.Prototype.Apply}.
      * @param {String} Name - The name of the property.
      * @param {String|Number} Value - The value.
@@ -403,6 +415,20 @@ class Logfont {
     Set(Name, Value) {
         this.%Name% := Value
         this.Apply()
+    }
+    /**
+     * @desc - Sets the font size and returns the font height.
+     *
+     * @param {Integer} points - The font size.
+     *
+     * @param {Integer} [dpi = this.dpi] - The dpi. If unset, and if {@link Logfont#hwnd} is defined,
+     * the dpi of the window associated with {@link Logfont#hwnd} is used. If {@link Logfont#hwnd}
+     * is **not** defined, `96` is used.
+     *
+     * @returns {Integer} - The font height as `height := Round(points / -72 * dpi, 0)`.
+     */
+    SetFontSize(points, dpi := this.dpi) {
+        return this.height := Round(points / -72 * dpi, 0)
     }
     __Delete() {
         if this.handle {
@@ -468,7 +494,7 @@ class Logfont {
      */
     fontSize {
         Get => Round(this.height * -72 / this.dpi, 0)
-        Set => this.height := Round(Value * this.dpi / -72)
+        Set => this.height := Round(Value / -72 * this.dpi, 0)
     }
     /**
      * Gets or sets the font height.
